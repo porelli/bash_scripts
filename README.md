@@ -1,4 +1,4 @@
-bash_scripts
+Bash scripts
 ============
 
-Bash scripts
+Collections of some useful bash scripts

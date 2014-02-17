@@ -1,0 +1,31 @@
+#!/bin/sh
+
+DESTINATION=$1
+CURRENTDIR=`pwd`
+
+echo BackUp...
+
+#fstab
+cp -a -v /etc/fstab $DESTINATION/
+
+#xorg
+cp -a -v /etc/X11/xorg.conf* $DESTINATION/
+
+#samba
+cp -a -v /etc/samba/smb.conf $DESTINATION/
+
+#apt
+cp -a -v /etc/apt/sources.list $DESTINATION/
+sudo dpkg --get-selections > $DESTINATION/installedpackages.txt
+
+#grub
+cp -a -v /boot/grub/menu.lst $DESTINATION/
+
+#ifup
+cp -a -v /etc/network/interfaces $DESTINATION/
+
+#wicd
+sudo cp -a -v -R /etc/wicd $DESTINATION/
+
+#sysctl.conf
+cp -a -v /etc/sysctl.conf $DESTINATION/

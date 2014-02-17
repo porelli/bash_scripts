@@ -1,0 +1,26 @@
+#!/bin/bash
+rm paginedimanuale.{ps,pdf}
+for i in {1..7}
+do
+	for j in `ls /usr/share/man/man$i`
+	do
+		if [ -h "/usr/share/man/man$i/$j" ] ; then
+			rigals=`ls -l /usr/share/man/man$i/$j`
+			echo "Il file $j della sezione $i è un link simbolico"
+			puntato=`echo $rigals|awk '{ print $11 }'`
+			#echo "Il file punta a $puntato"
+			if [ `echo "$puntato" | grep ".gz" | grep -v "../"` ] ; then
+				nuovonome=`echo $puntato|sed -e "s/\(.*\)...gz$/\1/g"`
+				nuovonomej=`echo $j|sed -e "s/\(.*\)...gz$/\1/g"`
+				echo -e "\n$nuovonomej ($i): See $nuovonome ($i)\n" | groff -Tps - >> paginedimanuale.ps
+				#echo -e "\n$nuovonomej ($i): See $nuovonome ($i)\n"
+			fi
+		else
+			nuovonome=`echo $j|sed -e "s/\(.*\)...gz$/\1/g"`
+			man -t $nuovonome >> paginedimanuale.ps
+			
+		fi
+	done
+done
+ps2pdf  - < paginedimanuale.ps > paginemanuale.pdf
+	

@@ -1,0 +1,71 @@
+#!/bin/sh -e
+#
+# Firewall
+#
+
+INTERNAL_IFACE=eth0
+EXTERNAL_IFACE=eth1
+
+start(){
+	PATH=/usr/sbin:/sbin:/bin:/usr/bin
+
+	#
+	# delete all existing rules.
+	#
+	iptables -F
+	iptables -t nat -F
+	iptables -t mangle -F
+	iptables -X
+
+	# Always accept loopback traffic
+	iptables -A INPUT -i lo -j ACCEPT
+
+
+	# Allow established connections, and those not coming from the outside
+	iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	iptables -A INPUT -m state --state NEW -i ! $EXTERNAL_IFACE -j ACCEPT
+	iptables -A FORWARD -i $EXTERNAL_IFACE -o $INTERNAL_IFACE -m state --state ESTABLISHED,RELATED -j ACCEPT
+	iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+
+	# Allow outgoing connections from the LAN side.
+	iptables -A FORWARD -i $INTERNAL_IFACE -o $EXTERNAL_IFACE -j ACCEPT
+
+	# Masquerade.
+	iptables -t nat -A POSTROUTING -o $EXTERNAL_IFACE -j MASQUERADE
+
+	# Don't forward from the outside to the inside.
+	iptables -A FORWARD -i $EXTERNAL_IFACE -o $EXTERNAL_IFACE -j REJECT
+
+	# Enable routing.
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+}
+
+stop(){
+	#
+	# delete all existing rules.
+	#
+	iptables -F
+	iptables -t nat -F
+	iptables -t mangle -F
+	iptables -X
+
+	# Disable routing.
+	echo 0 > /proc/sys/net/ipv4/ip_forward
+}
+case "$1" in
+    start)
+	start
+        ;;
+    stop)
+	stop
+        ;;
+    restart)
+	stop ; start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}" >&2
+        exit 1
+        ;;
+esac
+
+

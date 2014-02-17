@@ -1,0 +1,3 @@
+#!/bin/sh
+
+montage -size 500x500 /media/ALINA/letizia/tutte/*.jpg  -thumbnail 500x500 -bordercolor Lavender -background grey40  -gravity Center   -pointsize 40  -font /home/michele/.fonts/DESYREL.TTF -density 144x144  +polaroid  -resize 50%   -set label ''  -background white  -geometry +1+1  -tile 10x -title 'Spagna 2009' index.html

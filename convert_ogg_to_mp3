@@ -1,0 +1,78 @@
+#!/bin/sh 
+# (c) Mathias Laurin, Tokyo, 20070220, GPLv2 
+# Dep: oggdec and lame 
+# 
+# Takes a filename as argument, use for loops or 
+# find for batch processing! 
+
+INFILE="$1" 
+MYPATH="$2" 
+
+#VERBOSE=1 
+
+# Quality / approx bitrate 
+#(HQ)     -V0 245  # -V1 225  # -V2 190  # -V3 175 
+#(mid Q)  -V4 165  # -V5 130  # -V6 115 
+#(low Q)  -V7 100  # -V8 85  # -V9 65 
+LAMEARGS="-V5 --vbr-new" 
+LAMEARGS="$LAMEARGS --replaygain-fast" 
+#LAMEARGS="$LAMEARGS --quiet" 
+
+if [ "${INFILE##*.}" = "ogg" ] 
+then 
+        echo "<<< $INFILE" 
+
+        # set/create new directory and filename.mp3 
+        OUTFILE=$(basename "${INFILE%ogg}mp3") 
+        OUTPATH="${MYPATH:-.}/$(dirname "$INFILE")" 
+
+        if [ -e "$OUTPATH/$OUTFILE" ] 
+        then 
+                # Skip encoding if the file already exists 
+                echo "$OUTPATH/$OUTFILE already exists, skipping" 
+                exit 
+        fi 
+
+        [ ! $DEBUG ] && \ 
+                [ ! -d "$OUTPATH" ] && mkdir -p "$OUTPATH" 
+
+        # get ogginfo once 
+        INFO="$(ogginfo "$INFILE")" 
+
+        # parse tags 
+        ARTIST="$(echo "$INFO" | awk 'BEGIN { IGNORECASE = 1; FS = "="} 
+/^[ \t\f\n\r\v]Artist=/ { print $2 }')" 
+        [ -n "$ARTIST" ] || ARTIST="Anonymous" 
+        ALBUM="$(echo "$INFO" | awk 'BEGIN { IGNORECASE = 1; FS = "="} 
+/^[ \t\f\n\r\v]Album=/ { print $2 }')" 
+        [ -n "$ALBUM" ] || ALBUM="Untitled" 
+        GENRE="$(echo "$INFO" | awk 'BEGIN { IGNORECASE = 1; FS = "="} 
+/^[ \t\f\n\r\v]Genre=/ { print $2 }')" 
+        [ -n "$GENRE" ] || GENRE="0" 
+        TITLE="$(echo "$INFO" | awk 'BEGIN { IGNORECASE = 1; FS = "="} 
+/^[ \t\f\n\r\v]Title=/ { print $2 }')" 
+        [ -n "$TITLE" ] || TITLE="Untitled" 
+        DISC="$(echo "$INFO" | awk 'BEGIN { IGNORECASE = 1; FS = "="} 
+/^[ \t\f\n\r\v]Disc=/ { print $2 }')" 
+        #[ -n "$DISC" ] || DISC= 
+        TRACK="$(echo "$INFO" | awk 'BEGIN { IGNORECASE = 1; FS = "="} 
+/^[ \t\f\n\r\v]Tracknumber=/ { print $2 }')" 
+        [ -n "$TRACK" ] || TRACK="00" 
+        #[ "$#TRACK" = "1" ] && TRACK="0$TRACK" 
+        YEAR="$(echo "$INFO" | awk 'BEGIN { IGNORECASE = 1; FS = "="} 
+/^[ \t\f\n\r\v]Date=/ { print $2 }')" 
+        [ -n "$YEAR" ] || YEAR="00" 
+
+
+        # on-the-fly re-encoding 
+        echo ">>> $OUTPATH/$OUTFILE" 
+        if [ $VERBOSE ] 
+        then 
+                echo "$ARTIST" 
+                echo "$ALBUM" 
+                echo "$GENRE" 
+                echo "$DISC$TRACK" 
+        fi 
+        oggdec -Q "$INFILE" -o - | lame "$LAMEARGS" --ta "$ARTIST" --tl "$ALBUM" --tg "$GENRE" --tt "$TITLE" --tn "$DISC$TRACK" --ty "$YEAR" - "$OUTPATH/$OUTFILE" 
+
+fi

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+FILES=`ls`
+mkdir converted
+for i in $FILES
+do
+convert "$i" "converted/$i.jpg"
+done

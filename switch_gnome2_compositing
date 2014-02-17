@@ -1,0 +1,11 @@
+#!/bin/sh
+
+NOW=`gconftool-2 -g /apps/metacity/general/compositing_manager`
+
+if [ $NOW = "true" ]; then
+	gconftool-2 -s --type bool /apps/metacity/general/compositing_manager false
+	killall cairo-dock
+else
+	gconftool-2 -s --type bool /apps/metacity/general/compositing_manager true
+	cairo-dock
+fi

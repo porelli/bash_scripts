@@ -1,0 +1,19 @@
+#!/bin/sh -e
+#
+# A little script to chroot
+#
+
+CHROOTDIR="$1"
+
+sudo cp /etc/hosts $CHROOTDIR/etc/hosts
+sudo cp /etc/fstab $CHROOTDIR/etc/fstab
+sudo cp /etc/resolv.conf $CHROOTDIR/etc/resolv.conf
+sudo mount -o bind /proc $CHROOTDIR/proc
+sudo mount -o bind /dev $CHROOTDIR/dev
+sudo mount -o bind /dev/pts $CHROOTDIR/dev/pts
+sudo mount -o bind /dev/shm $CHROOTDIR/dev/shm
+sudo mount -o bind /tmp $CHROOTDIR/tmp
+sudo mount -o bind /var/tmp $CHROOTDIR/var/tmp
+#sudo mount -o bind /proc/bus/usb $CHROOTDIR/proc/bus/usb
+sudo mount -o bind /sys $CHROOTDIR/sys
+sudo chroot $CHROOTDIR /bin/bash

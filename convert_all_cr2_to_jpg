@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# A script for converting RAW images to JPEG with Exif information.
+#
+# Revision: 1
+# Requires: dcraw, cjpeg and exiv2
+#
+# Author: Yu-Jie Lin
+# Created date: 6/25/2007
+# Website: http://www.livibetter.com/
+
+if [ ${#1} -eq 0 ]
+then
+	echo "Usage: raw2jpg [RAW extension]"
+	echo "Example: raw2jpg CR2"
+	exit
+fi
+
+raw_ext=$1
+
+rm -f log
+
+for rawname in `ls *.$raw_ext`
+do
+	filename=${rawname%.$raw_ext}
+	echo -n "$rawname: "
+	jpgname=$filename.jpg
+	if [ -e $jpgname ]
+		then
+			echo -e "JPG exists. \e[1;34mSkipped.\e[0m"
+		else
+			echo $rawname >> log
+			echo -n "dcraw"
+			dcraw -c -q 0 -w -H 5 -b 8 $rawname 2>>log 2>>log | cjpeg -quality 80 > $jpgname 2>>log
+			[ $? -gt 0 ] && echo -e " \e[1;31mError!\e[0m" && continue
+			echo -n " > exiv2"
+			exiv2 ex $rawname 2>> log && exiv2 insert $jpgname 2>> log
+			echo -n " > timestamp"
+			touch -r $rawname $jpgname 2>> log
+			[ $? -gt 0 ] && echo -e " \e[1;31mError!\e[0m" && continue
+			echo -e " > \e[1;32mDone.\e[0m"
+		rm -f $filename.exv
+	fi
+done
+
+echo; echo -e "\e[1;32mAll Done.\e[0m"

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+rsync --progress --stats -r -tgo -l -p -D --update --delete $1/ $2/

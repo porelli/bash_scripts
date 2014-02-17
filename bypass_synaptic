@@ -1,0 +1,25 @@
+#!/bin/sh -e
+#
+# A little script to bypass synaptic when it doesn't work properly
+#
+
+if [ "$1" = "" ]; then
+	echo "Usage: $0 <filname>" >&2
+        exit 1
+fi
+
+#TODO Check if the file really exist!
+
+echo "Applying your selections..."
+echo ""
+sudo dpkg --set-selections < $1
+
+echo "Executing imported selections..."
+echo ""
+sudo apt-get -y --force-yes dselect-upgrade
+
+echo "Removing your selections file..."
+echo ""
+#sudo rm $1
+
+echo "Done...!"

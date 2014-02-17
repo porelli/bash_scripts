@@ -1,0 +1,5 @@
+#!/bin/sh
+
+gconftool -t string -s /system/gstreamer/0.10/default/musicaudiosink "alsasink device=bluetooth"
+$1
+gconftool -t string -s /system/gstreamer/0.10/default/musicaudiosink "autoaudiosink"

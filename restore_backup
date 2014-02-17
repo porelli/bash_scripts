@@ -1,0 +1,39 @@
+#!/bin/sh
+
+ORIG=$1
+CURRENTDIR=`pwd`
+
+#fstab
+cp -i -a -v $ORIG/fstab /etc/fstab
+
+#xorg
+cp -i -a -v $ORIG/xorg.conf* /etc/X11/
+
+#samba
+cp -i -a -v $ORIG/smb.conf /etc/samba/
+
+#apt
+cp -i -a -v $ORIG/sources.list /etc/apt/
+
+#grub
+cp -i -a -v $ORIG/menu.lst /boot/grub/
+
+#ifup
+cp -i -a -v $ORIG/interfaces /etc/network/
+
+#wicd
+cp -i -a -v -R $ORIG/wicd /etc/
+
+#sysctl.conf
+cp -i -a -v $ORIG/sysctl.conf /etc/
+
+
+#### Extra  ####
+
+#restore mount points
+cat /etc/fstab | grep -i /mnt | awk '{system("sudo mkdir -v "$2)}'
+
+#reinstall packages
+sudo dpkg --set-selections < $ORIG/installedpackages.txt
+sudo apt-get dselect-upgrade
+

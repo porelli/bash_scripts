@@ -1,0 +1,60 @@
+#!/bin/bash
+
+SDKPATH="/home/michele/bin/linux/32bit/android-sdk-linux_x86"
+KEYSPATH="$SDKPATH/openssl"
+SIGNAPKJAR="$KEYSPATH/signapk.jar"
+
+if [ "$1" = "" ] ; then
+	echo "Usage: `basename $0` [zip/apk to sign] (destination)"
+	exit 0
+fi
+
+OUTPUTFULLFILE="$2"
+TEMPDESTINATION="signed-`date +%s`.zip"
+INPUTFULLFILE="$1"
+INPUTFILENAME="$(basename $INPUTFULLFILE)"
+INPUTFILENAMEPURE="${INPUTFILENAME%.*}"
+INPUTEXTENSION="${INPUTFULLFILE##*.}"
+
+#echo "input file name: $INPUTFILENAMEPURE"
+#echo "input file extension: $INPUTEXTENSION"
+
+java -jar "$SIGNAPKJAR" "$KEYSPATH/certificate.pem" "$KEYSPATH/key.pk8" "$INPUTFULLFILE" "$TEMPDESTINATION"
+
+if [ "$OUTPUTFULLFILE" = "" ] ; then
+	mv "$TEMPDESTINATION" "$INPUTFILENAMEPURE-signed.$INPUTEXTENSION"
+	exit 0
+fi
+
+#echo "destination: $OUTPUTFULLFILE"
+
+OUTPUTFILENAME="$(basename $OUTPUTFULLFILE)"
+OUTPUTDIR="$(dirname $OUTPUTFULLFILE)"
+OUTPUTFILENAMEPURE="${OUTPUTFILENAME%.*}"
+
+if [ "$OUTPUTDIR" = "" ] ; then
+	#echo "Directory omessa!"
+	OUTPUTDIR="."
+fi
+
+if [ -d "$OUTPUTFULLFILE" ] ; then
+	#echo "Nome file omesso!"
+	OUTPUTFULLFILEFAKE="$OUTPUTFULLFILE/asd"
+	OUTPUTDIR="$(dirname $OUTPUTFULLFILEFAKE)"
+	OUTPUTFILENAMEPURE="$INPUTFILENAMEPURE-signed"
+else
+	OUTPUTEXTENSION="${OUTPUTFULLFILE##*.}"
+fi
+
+if [ "$OUTPUTEXTENSION" = "" ] || [[ "$OUTPUTEXTENSION" == */* ]] || [ "$OUTPUTEXTENSION" = "$OUTPUTFILENAMEPURE" ] ; then
+	#echo "Estensione file omessa/corrotta!"
+	OUTPUTEXTENSION="$INPUTEXTENSION"
+fi
+
+#echo "output dir: $OUTPUTDIR"
+#echo "output file name: $OUTPUTFILENAMEPURE"
+#echo "output file extension: $OUTPUTEXTENSION"
+
+mv "$TEMPDESTINATION" "$OUTPUTDIR/$OUTPUTFILENAMEPURE.$OUTPUTEXTENSION"
+
+exit 0

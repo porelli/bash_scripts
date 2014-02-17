@@ -1,0 +1,26 @@
+#!/bin/bash
+
+killall "pcsc_scan"
+
+if [ $(pidof pcsc_scan) ]; then 
+       echo pcsc_scan is running
+else
+       pcsc_scan -n > ~/.cardscan.txt &
+fi
+
+while inotifywait ~/.cardscan.txt
+
+do
+
+tail -n 3 ~/.cardscan.txt | grep inserted
+
+if [ $? == 0 ]; then
+        echo unlocked
+        gnome-screensaver-command -d
+else
+        tail -n 3 ~/.cardscan.txt | grep removed
+        if [ $? == 0 ]; then
+                gnome-screensaver-command --lock -a
+        fi
+fi
+done

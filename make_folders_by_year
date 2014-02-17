@@ -1,0 +1,20 @@
+#!/bin/bash
+
+START=1970
+STOP=2020
+INTERNAL_FOLDERS="Branco Reparto Noviziato Clan Co.Ca Gruppo"
+
+for i in `seq $START $STOP`;
+	do
+		j=$i
+		let j++
+		mkdir $i-$j
+		cd $i-$j
+		for k in $INTERNAL_FOLDERS
+			do
+				mkdir $k
+			done
+		cd ..
+	done
+exit 0
+

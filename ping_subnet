@@ -1,0 +1,13 @@
+#!/bin/sh
+
+subnet=169.254.
+addr1=1
+addr2=1
+
+while [ $addr2 -lt 256 ]; do 
+	while [ $addr1 -lt 256 ]; do
+		ping -c 1 -t $subnet$addr1.$addr2 > /dev/null && echo $subnet$addr1.$addr2 Is Alive
+		let addr1=addr1+1
+		let addr2=addr2+1
+	done
+done

@@ -1,0 +1,69 @@
+#!/bin/bash
+
+# This script will migrate schema and data from a SQLite3 database to PostgreSQL.
+# Schema translation based on http://stackoverflow.com/a/4581921/1303625.
+# Some column types are not handled (e.g blobs).
+# 
+# See also:
+# - http://stackoverflow.com/questions/4581727/convert-sqlite-sql-dump-file-to-postgresql
+# - https://gist.github.com/bittner/7368128
+
+# cross-OS compatibility (greadlink, gsed, gzcat are GNU implementations for OSX)
+readlink=readlink; sed=sed; zcat=zcat
+[[ `uname` == 'Darwin' ]] && {
+	readlink=greadlink; sed=gsed; zcat=gzcat
+		which $readlink $sed $zcat > /dev/null || {
+		echo 'ERROR: GNU utils required for Mac. You may use homebrew to install them: brew install coreutils gnu-sed'
+		exit 1
+	}
+}
+
+[[ "$4" == "" || "$5" != "" ]] && {
+	echo "Sqlite3 to PostgreSQL database migration: Dump all data from an existing Sqlite database, and create a new PostgreSQL DB from it."
+	echo "Usage: ${0##*/} <sqlite_src_db_file> <pg_dest_host> <pg_dest_db_name> <pg_dest_user>"
+	exit 1
+}
+
+echo "HINT: to avoid password requests use ~/.pgpass (http://www.postgresql.org/docs/9.3/static/libpq-pgpass.html)"
+
+SQLITE_DB_PATH=$1
+PG_HOST=$2
+PG_DB_NAME=$3
+PG_USER_NAME=$4
+
+SQLITE_DUMP_FILE="/tmp/sqlite_dump_data.sql"
+
+sqlite3 $SQLITE_DB_PATH .dump > $SQLITE_DUMP_FILE
+
+# PRAGMAs are specific to SQLite3.
+$sed -i '/PRAGMA/d' $SQLITE_DUMP_FILE
+# Remove unsigned as Postgres doesn't know it.
+$sed -i 's/ unsigned[ ]*/ /g' $SQLITE_DUMP_FILE
+# Convert sequences.
+$sed -i '/sqlite_sequence/d ; s/integer PRIMARY KEY AUTOINCREMENT/serial PRIMARY KEY/ig ; s/"id" integer NOT NULL PRIMARY KEY/"id" serial NOT NULL PRIMARY KEY/g' $SQLITE_DUMP_FILE
+# Convert column types.
+$sed -i 's/datetime/timestamp with time zone/g ; s/integer[(][^)]*[)]/integer/g ; s/text[(]\([^)]*\)[)]/varchar(\1)/g' $SQLITE_DUMP_FILE
+# Convert 0/1 values for boolean types to '0'/'1'.
+for bool in 0 0 1 1; do
+	# global flag seems to be broken(?) for -i on OSX GNU sed, so we loop twice
+	$sed -i "s/,${bool},/,'${bool}',/g" $SQLITE_DUMP_FILE
+	$sed -i "s/,${bool})/,'${bool}')/g" $SQLITE_DUMP_FILE
+	$sed -i "s/(${bool},/('${bool}',/g" $SQLITE_DUMP_FILE
+done
+
+echo "Creating db on PostgreSQL..."
+#createdb -h $PG_HOST -U $PG_USER_NAME $PG_DB_NAME || exit 2
+
+echo "Sending dump..."
+psql -h $PG_HOST $PG_DB_NAME $PG_USER_NAME < $SQLITE_DUMP_FILE || exit 2
+# TODO: grep out error and success messages and redirect them to ${SQLITE_DUMP_FILE}-{error,success}.log
+# 2>&1 | sed '/ERROR:  current transaction is aborted, commands ignored until end of transaction block/d' | sed '/^CREATE TABLE$/d' | sed '/^INSERT 0 1$/d' | sed '/^CREATE INDEX$/d'
+
+echo "Update Postgres sequences..."
+psql -h $PG_HOST $PG_DB_NAME $PG_USER_NAME -c "\ds" | grep sequence | cut -d'|' -f2 | tr -d '[:blank:]' |
+while read sequence_name; do
+  table_name=${sequence_name%_id_seq}
+
+  psql -h $PG_HOST $PG_DB_NAME $PG_USER_NAME -c "select setval('$sequence_name', (select max(id) from $table_name))" || exit 2
+done
+

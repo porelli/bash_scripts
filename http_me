@@ -1,9 +1,20 @@
 #!/bin/bash
 
-mkdir /tmp/thin 1>&2 2> /dev/null
+usage(){
+	echo -e "USAGE: \n\t# $0 [-p PORT]"
+}
 
-echo -e "# The static content rooted in the current working directory\n# Dir.pwd =&gt;http://0.0.0.0:3000/\n#\nroot=Dir.pwd\nputs \">>> Serving: #{root}\"\nrun Rack::Directory.new(\"#{root}\")" > /tmp/thin/static.ru
+MYPID=$$
+mkdir /tmp/thin-${MYPID} 1>&2 2> /dev/null
 
-thin -R /tmp/thin/static.ru start
+if [ "$1" == "-p" ] ; then
+	PORT="$2"
+else
+	PORT=3000
+fi
 
-rm -Rf /tmp/thin
+echo -e "# The static content rooted in the current working directory\n# Dir.pwd =&gt;http://0.0.0.0:$PORT/\n#\nroot=Dir.pwd\nputs \">>> Serving: #{root}\"\nrun Rack::Directory.new(\"#{root}\")" > /tmp/thin-${MYPID}/static.ru
+
+thin -R /tmp/thin-${MYPID}/static.ru start -p $PORT
+
+rm -Rf /tmp/thin-${MYPID}

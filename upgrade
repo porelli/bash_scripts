@@ -1,0 +1,40 @@
+#!/bin/bash
+
+list="gems rbenv npm system"
+my_path="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+gems_func(){
+  gem update `gem list | cut -d ' ' -f 1`
+}
+
+rbenv_func(){
+  rbenv update
+}
+
+npm_func(){
+  npm update -g
+}
+
+system_func(){
+  if [ "${2}" == "unattended" ] ; then
+    sudo apt-get update ; sudo apt-get -y dist-upgrade
+  else
+    sudo apt-get update ; sudo apt-get dist-upgrade
+  fi
+}
+
+case "${1}" in
+  all)
+    for app in ${list} ; do
+      x-terminal-emulator --command="${my_path}/${0} ${app} ${2}" --title="Upgrading ${app}" &
+    done
+    ;;
+  ""|help)
+    echo "USAGE: ${0} [application|all] [unattended]"
+    ;;
+  load_functions)
+    ;;
+  *)
+    ${1}_func ${2}
+    ;;
+esac

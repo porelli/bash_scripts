@@ -26,7 +26,7 @@ system_func(){
 case "${1}" in
   all)
     for app in ${list} ; do
-      x-terminal-emulator --command="${my_path}/${0} ${app} ${2}" --title="Upgrading ${app}" &
+      x-terminal-emulator --command="${my_path}/`basename ${0}` ${app} ${2}" --title="Upgrading ${app}" &
     done
     ;;
   ""|help)

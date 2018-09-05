@@ -15,6 +15,11 @@ fi
 
 echo -e "# The static content rooted in the current working directory\n# Dir.pwd =&gt;http://0.0.0.0:$PORT/\n#\nroot=Dir.pwd\nputs \">>> Serving: #{root}\"\nrun Rack::Directory.new(\"#{root}\")" > /tmp/thin-${MYPID}/static.ru
 
+echo ""
+echo "*** I'm reachable on: ***"
+/sbin/ifconfig | awk '/inet addr/{print substr($2,6)}'
+echo ""
+
 thin -R /tmp/thin-${MYPID}/static.ru start -p $PORT
 
 rm -Rf /tmp/thin-${MYPID}

@@ -1,0 +1,20 @@
+#!/bin/bash
+INSTANCE=${1}
+CONFDIR=${2}
+OPTIONS=${*:3}
+
+TMPDIR="/tmp/${USER}/owncloud_{INSTANCE}"
+
+# ensure path exists
+test -e "$CONFDIR/tmp" || mkdir -p "$CONFDIR"
+test -e "$TMPDIR" || mkdir -p "$TMPDIR"
+
+export TMPDIR
+
+# copy the binary
+# yes we need to do this, or owncloud will think it's the same instance
+# NOTE: symlink won't help unfortunatly
+cp /usr/bin/owncloud "/tmp/${USER}/owncloud_${INSTANCE}.bin"
+
+# start owncloud with custom confdir
+"/tmp/${USER}/owncloud_${INSTANCE}.bin" --confdir "${CONFDIR}" ${OPTIONS}

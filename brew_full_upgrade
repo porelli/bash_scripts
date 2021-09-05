@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+### Dependencies ###
+### brew install mas
+### brew tap buo/cask-upgrade
+
 # Ctrl-C trap. Catches INT signal. This is necessary to ensure that we kill all the children
 trap "kill ${$}" INT
 
@@ -17,9 +21,9 @@ echo "Cleaning brew cache..."
 brew cleanup
 
 echo "Upgrading brew cask apps..."
-casks=( $(brew cask outdated | awk '{ print $1 }') )
+casks=( $(brew outdated --cask | awk '{ print $1 }') )
 
-if [ -z "${casks}" ] ; then 
+if [ -z "${casks}" ] ; then
   echo "Yay! No casks to upgrade!"
 else
   echo -n "The following casks are going to be upgraded: "
@@ -31,11 +35,11 @@ else
   for cask in ${casks[@]}
   do
       echo "${red}${cask}${reset} requires ${red}update${reset}."
-      brew cask fetch ${cask}
+      brew fetch --cask ${cask}
       exit_status=${?}
       # If we can't download the new release (hash problems, website unavailibility, aliens...) we don't want to uninstall the current version!
       if [ ${exit_status} -eq 0 ] ; then
-        brew cask uninstall ${cask}
+        brew uninstall --cask ${cask}
         exit_status=${?}
         if [ ${exit_status} -ne 0 ] ; then
           echo "${red}${cask}${reset} encountered an error during the uninstallation (${exit_status}). ${red}PLEASE CHECK THE LOGS.${reset}"
@@ -43,7 +47,7 @@ else
           # Skip to the next application to upgrade
           continue
         fi
-        brew cask install ${cask}
+        brew install --cask ${cask}
         exit_status=${?}
         if [ ${exit_status} -eq 0 ] ; then
           successful+=("${cask}")
@@ -62,7 +66,7 @@ else
 
   if [ ${#problematic[@]} -eq 0 ] ; then
     echo "Cleaning brew cask cache..."
-    brew cask cleanup
+    brew cleanup # Brew cask cleanup has been deprecated and disabled on 2018-09-30
     if [ ${#successful[@]} -eq 0 ] ; then echo "${green}${successful[*]}${reset}have been successfully upgraded." ; fi;
     echo "${green}Congratulations, your system is clean and up-to-date!${reset}"
   else
@@ -71,3 +75,5 @@ else
 fi
 
 brew cu -a -y
+
+mas upgrade

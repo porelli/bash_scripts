@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+# This is useful to move a dataset (for example if you were using a beta version of ZFS and you need to rebuild your dataset)
+
+ORIGIN=${1}
+DESTINATION=${2}
+TEMPORARY_SNAPSHOT="relocate-`head /dev/urandom | tr -dc A-Za-z0-9 | head -c 13 ; echo ''`"
+
+# take a temporary snapshot
+zfs snapshot -r ${ORIGIN}@${TEMPORARY_SNAPSHOT}
+# copy data from old to new dataset
+zfs send        ${ORIGIN}@${TEMPORARY_SNAPSHOT} | pv | zfs receive -v ${DESTINATION}
+# remove old snapshot in the destination dataset
+zfs destroy     ${DESTINATION}@${TEMPORARY_SNAPSHOT}
+# remove old snapshot in the origin dataset
+zfs destroy     ${ORIGIN}@${TEMPORARY_SNAPSHOT}
+# remove old dataset
+zfs destroy     ${ORIGIN}

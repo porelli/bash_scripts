@@ -216,8 +216,9 @@ function create_network() {
 }
 
 function delete_container() {
+  # trying to stop the container before deleting, not triggering a failure because the container might be already stopped
   log "        Stopping remote ${CONTAINER} container"
-  DOCKER_HOST=${REMOTE_DOCKER} docker stop ${CONTAINER} 1>${VERBOSE} || log "Couldn't stop container on remote host" 1
+  DOCKER_HOST=${REMOTE_DOCKER} docker stop ${CONTAINER} 1>${VERBOSE}
 
   log "        Deleting remote ${CONTAINER} container"
   DOCKER_HOST=${REMOTE_DOCKER} docker rm ${CONTAINER}   1>${VERBOSE} || log "Couldn't delete container on remote host" 1

@@ -1,6 +1,8 @@
 #!/bin/bash
 
-## TODO:
+############################################################
+# TODO                                                     #
+############################################################
 # - option to move the actual container image (including local changes) or just download the latest containter image from upstream
 # - pv estimations are MOSTLY correct (generally within +/- 3%)
 # - bind mounts should at least raise a warning
@@ -10,17 +12,16 @@
 # - replace echo with log and add verbosity levels
 # - add dependencies check (docker, pv, bzip2, etc)
 # - add an option to copy all the containers part of a network
+# - allow pull instead of push
+# - improve logging
 
-## WON'T DO:
-# - delete container and volumes on local side
-# - use a different name for the container on remote side
+# WON'T DO:
+# - delete container and volumes on local side -> Too risky
+# - use a different name for the container on remote side -> Avoid mistakes
 
-trap "exit 1" TERM
-export TOP_PID=${$}
-
-TTY=$(tty)
-# COMMIT=$(openssl rand -hex 12)
-
+############################################################
+# License                                                  #
+############################################################
 function license() {
   read -r -d '' license <<-EOF
 MIT License
@@ -225,16 +226,9 @@ function check_remote_container_and_stop() {
     log "        ${CONTAINER} container already exists on the remote host..."
     prompt_options
     case ${?} in
-      1)
-        delete_container
-        ;;
-      2)
-        log "        Skipping..."
-        return 1
-        ;;
-      3)
-        goodbye
-        ;;
+      1) delete_container ;;
+      2) log "        Skipping..." ; return 1 ;;
+      3) goodbye ;;
     esac
   fi
 
@@ -310,16 +304,10 @@ function iterate_networks() {
         log "        ${docker_network} network exists on the remote host..."
         prompt_options
         case ${?} in
-          1)
-            delete_network ${docker_network}
-            create_network ${docker_network}
-            ;;
-          2)
-            log "        Skipping..."
-            ;;
-          3)
-            goodbye
-            ;;
+          1) delete_network ${docker_network}
+             create_network ${docker_network} ;;
+          2) log "        Skipping..." ;;
+          3) goodbye ;;
         esac
       fi
     fi
@@ -340,17 +328,11 @@ function iterate_volumes() {
       else
         prompt_options
         case ${?} in
-          1)
-            delete_volume ${docker_volume}
+          1) delete_volume ${docker_volume}
             create_volume ${docker_volume}
-            copy_volume ${docker_volume}
-            ;;
-          2)
-            log "        Skipping..."
-            ;;
-          3)
-            goodbye
-            ;;
+             copy_volume ${docker_volume} ;;
+          2) log "        Skipping..." ;;
+          3) goodbye ;;
         esac
       fi
     done
@@ -420,6 +402,15 @@ function transfer_container() {
   log "  5/5 - Run container"
   run_container
 }
+
+############################################################
+# Traps and global variables                               #
+############################################################
+trap "exit 1" TERM
+export TOP_PID=${$}
+
+TTY=$(tty)
+# COMMIT=$(openssl rand -hex 12)
 
 ############################################################
 ############################################################

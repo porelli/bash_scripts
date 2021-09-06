@@ -1,21 +1,23 @@
 #!/bin/bash
 
 ############################################################
-# TODO                                                     #
+# TODO (in order of priority)                              #
 ############################################################
-# - option to move the actual container image (including local changes) or just download the latest containter image from upstream
-# - pv estimations are MOSTLY correct (generally within +/- 3%)
-# - bind mounts should at least raise a warning
-# - add more compression options
-# - when unattended, the message triggering the automatic action should still be displayed
-# - options should be validated
-# - replace echo with log and add verbosity levels
-# - add dependencies check (docker, pv, bzip2, etc)
-# - add an option to copy all the containers part of a network
 # - allow pull instead of push
-# - improve logging
+# - check if docker is reachable on both sides
+# - options should be validated
+# - add more compression options (bzip2 is slow)
+# - bind mounts should at least raise a warning
+# - option to move the actual container image (including local changes) or just download the latest containter image from upstream
+# - when unattended, the message triggering the automatic action should still be displayed
+# - pv estimations are MOSTLY correct (generally within +/- 3%)
+# - improve logging: replace echo with log function and add verbosity levels
+# - add an option to copy all the containers part of a network
+# - implement autoselect compression algorthim
 
-# WON'T DO:
+############################################################
+# WON'T DO                                                 #
+############################################################
 # - delete container and volumes on local side -> Too risky
 # - use a different name for the container on remote side -> Avoid mistakes
 
@@ -144,8 +146,39 @@ function parse_options() {
   fi
 }
 
-function goodbye()
-{
+function check_dependencies() {
+  if [[ "${OSTYPE}" == "linux-gnu"* ]]; then
+    commands=(docker pv getopt)
+    commands_instructions=(
+      "docker is not availble, please ensure it is installed and in your PATH"
+      "pv is not availble, please ensure it is installed and in your PATH"
+      "getopt is not availble, please ensure it is installed and in your PATH"
+    )
+  elif [[ "${OSTYPE}" == "darwin"* ]]; then
+    commands=(docker pv /usr/local/opt/gnu-getopt/bin/getopt)
+    commands_instructions=(
+      "docker is not availble, please ensure it is installed and in your PATH"
+      "pv is not availble, please install it with 'brew install pv'"
+      "gnu-getopt is not availble, please install it with 'brew install gnu-getopt'"
+    )
+
+    export PATH="/usr/local/opt/gnu-getopt/bin:${PATH}"
+  else
+    echo -e "\n"'WARNING: You are running the script on an unsupported OS, use at your own risk!'"\n"
+    sleep 5
+
+    return 1
+  fi
+
+  for (( i=0; i<${#commands[@]}; i++ ));
+  do
+    if ! command -v ${commands[${i}]} >/dev/null 2>&1 ; then
+      echo ${commands_instructions[${i}]}
+    fi
+  done
+}
+
+function goodbye() {
   suppress_message=${1}
 
   [[ ! -n "${suppress_message}" ]] && echo "Goodbye!"
@@ -329,7 +362,7 @@ function iterate_volumes() {
         prompt_options
         case ${?} in
           1) delete_volume ${docker_volume}
-            create_volume ${docker_volume}
+             create_volume ${docker_volume}
              copy_volume ${docker_volume} ;;
           2) log "        Skipping..." ;;
           3) goodbye ;;
@@ -417,6 +450,7 @@ TTY=$(tty)
 # Main program                                             #
 ############################################################
 ############################################################
+check_dependencies
 parse_options ${@}
 
 for CONTAINER in ${CONTAINERS}

@@ -20,7 +20,7 @@
 ############################################################
 # NOTES                                                    #
 ############################################################
-# Sincerily apologies if I wrote this in bash. When I started, it was supposed to be a short script!
+# Sincere apologies if I wrote this in bash. When I started, it was supposed to be a short script!
 
 ############################################################
 # License                                                  #
@@ -95,7 +95,7 @@ Reference: to create a new docker context check here: https://docs.docker.com/en
 -u | --unattended OPTION
   Description: Auto-answer questions with the selected option for the questions: [D]elete and continue, [S]kip, [A]bort
   Default: not enabled
-  Supported options: $(join_array_by ", " "${UNATTENDED_OPTION_ARGS[@]:1}")
+  Supported options: $(join_array_by ", " "${UNATTENDED_OPTION_ARGS[@]}")
 
 -v | --verbose
   Description: Enable verbose output. Error will be printed in any case
@@ -170,9 +170,9 @@ function parse_options() {
 
 function validate_arguments() {
   [[ ! " ${COMPRESS_ALGORITHM_ARGS[*]} " =~ " ${COMPRESS_ALGORITHM} " ]] && log "-c | --compress specified option is invalid: ${COMPRESS_ALGORITHM}. Valid options: $(join_array_by ", " "${COMPRESS_ALGORITHM_ARGS[@]}")" 1
-  [[ ! " ${UNATTENDED_OPTION_ARGS[*]} " =~ " ${UNATTENDED_OPTION} " ]] && log "-u | --unattended specified option is invalid: ${UNATTENDED_OPTION}. Valid options: $(join_array_by ", " "${UNATTENDED_OPTION_ARGS[@]:1}")" 1
   [[ ! " ${ACTION_ARGS[*]} " =~ " ${ACTION} " ]] && log "specified action is invalid. Valid options: $(join_array_by ", " ${ACTION_ARGS[@]})" 1
 
+  [[ -n ${UNATTENDED_OPTION} ]] && [[ ! " ${UNATTENDED_OPTION_ARGS[*]} " =~ " ${UNATTENDED_OPTION} " ]] && log "-u | --unattended specified option is invalid: ${UNATTENDED_OPTION}. Valid options: $(join_array_by ", " "${UNATTENDED_OPTION_ARGS[@]}")" 1
   [[ "${REMOTE_DOCKER}" == "${ORIGIN_DOCKER}" ]] && log "origin and destination cannot be the same." 1
 
   [[ -n "${ORIGIN_DOCKER}" ]] && check_docker_context "${ORIGIN_DOCKER}"
@@ -184,18 +184,19 @@ function check_dependencies() {
   if [[ "${OSTYPE}" == "linux-gnu"* ]]; then
     commands=(docker pv getopt)
     commands_instructions=(
-      "docker is not availble, please ensure it is installed and in your PATH"
-      "pv is not availble, please ensure it is installed and in your PATH"
-      "getopt is not availble, please ensure it is installed and in your PATH"
+      "docker is not available, please ensure it is installed and in your PATH"
+      "pv is not available, please ensure it is installed and in your PATH"
+      "getopt is not available, please ensure it is installed and in your PATH"
     )
   elif [[ "${OSTYPE}" == "darwin"* ]]; then
     commands=(docker pv /usr/local/opt/gnu-getopt/bin/getopt)
     commands_instructions=(
-      "docker is not availble, please ensure it is installed and in your PATH"
-      "pv is not availble, please install it with 'brew install pv'"
-      "gnu-getopt is not availble, please install it with 'brew install gnu-getopt'"
+      "docker is not available, please ensure it is installed and in your PATH"
+      "pv is not available, please install it with 'brew install pv'"
+      "gnu-getopt is not available, please install it with 'brew install gnu-getopt'"
     )
 
+    # adding path for gnu-getopt
     export PATH="/usr/local/opt/gnu-getopt/bin:${PATH}"
   else
     echo -e "\n"'WARNING: You are running the script on an unsupported OS, use at your own risk!'"\n"'Waiting 5 seconds before continuing...'"\n"
@@ -606,7 +607,7 @@ DOCKER_DESTINATION=""
 # Input validation                                         #
 ############################################################
 COMPRESS_ALGORITHM_ARGS=(bzip2 gzip none)
-UNATTENDED_OPTION_ARGS=('' D d S s A a)
+UNATTENDED_OPTION_ARGS=(D d S s A a)
 ACTION_ARGS=(push pull)
 
 ############################################################

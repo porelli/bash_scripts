@@ -3,11 +3,11 @@
 ############################################################
 # TODO (in order of priority)                              #
 ############################################################
-# - option to move the actual container image (including local changes) or just download the latest containter image from upstream
 # - in case of multiple containers, create resources all at once (i.e.: network may be the same, you don't want to delete and recreate each time)
 # - pv estimations are MOSTLY correct (generally within +/- 3%, more if volumes are very small)
 # - improve logging: replace echo with log function and add verbosity levels
 # - add an option to copy all the containers part of a network
+# - duplicate containers locally adding a suffix
 # - check if published ports are available before initate the copy
 # - implement autoselect compression algorthim
 
@@ -49,6 +49,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 EOF
+
   echo "${license}"
 }
 
@@ -59,7 +60,8 @@ function usage() {
   read -r -d '' usage <<-EOF
 Usage: $(basename ${0})
 Description: helps moving stateful containers between docker contexts (i.e.: from local to remote host). Be sure you created valid contexts before using this script!
-Options: [ -c | --compress (bzip2|gzip|none) ]
+Options: [ -a | --all_data ]
+         [ -c | --compress (bzip2|gzip|none) ]
          [ -h | --help ]
          [ -k | --keep_running ]
          [ -l | --license ]
@@ -72,6 +74,10 @@ Options: [ -c | --compress (bzip2|gzip|none) ]
 
 Reference: to create a new docker context check here: https://docs.docker.com/engine/reference/commandline/context_create/
            example: $ docker context create --docker host=ssh://foo@bar foobar
+
+-a | --all_data
+  Description: Preserve current image changes in your running container. This will copy the current image, the transfer could take much longer
+  Default: not enabled
 
 -c | --compress OPTION
   Description: Use compression with the selected algorithm
@@ -101,6 +107,7 @@ Reference: to create a new docker context check here: https://docs.docker.com/en
   Description: Enable verbose output. Error will be printed in any case
   Default: not enabled
 EOF
+
   echo "${usage}"
 }
 
@@ -108,7 +115,7 @@ EOF
 # Process the input options. Add options as needed.        #
 ############################################################
 function parse_options() {
-  PARSED_ARGUMENTS=$(getopt -a -o hlkvc:u:o: --long help,license,keep_running,verbose,compress:,unattended:,override_origin: -- "${@}")
+  PARSED_ARGUMENTS=$(getopt -a -o ahlkvc:u:o: --long all_data,help,license,keep_running,verbose,compress:,unattended:,override_origin: -- "${@}")
   VALID_ARGUMENTS=${?}
   if [ "${VALID_ARGUMENTS}" != "0" ]; then
     usage
@@ -120,6 +127,7 @@ function parse_options() {
   while :
   do
     case "${1}" in
+      -a | --all_data)              PRESERVE_IMAGE_STATE=1       ; shift   ;;
       -h | --help)                  HELP=1                       ; shift   ;;
       -l | --license)               LICENSE=1                    ; shift   ;;
       -c | --compress)              COMPRESS_ALGORITHM="${2}"    ; shift 2 ;;
@@ -147,11 +155,14 @@ function parse_options() {
     log "$(usage)" 2 1
   else
     ACTION=${1} ; shift
-    CONTAINERS=${*%${!#}} # container names
+    CONTAINERS=${*%${!#}} # containers names
     REMOTE_DOCKER=${@:$#} # docker context
 
     validate_arguments
+
     set_compression_algorithm "${COMPRESS_ALGORITHM}"
+
+    [[ -n ${PRESERVE_IMAGE_STATE} ]] && COMMIT=$(openssl rand -hex 12)
 
     case ${ACTION} in
       'pull')
@@ -162,20 +173,21 @@ function parse_options() {
         DOCKER_DESTINATION=${REMOTE_DOCKER} ;;
       *) log "Unsupported action!" 99 ;;
     esac
-
-    # just for some extra care
     [ "$(retrieve_docker_context "origin")" == "default" ] && [ "$(retrieve_docker_context "destination")" == "default" ] && log "FATAL: both contexts are set to default!"
+
   fi
 }
 
 function validate_arguments() {
+  # validate parameters
   [[ ! " ${COMPRESS_ALGORITHM_ARGS[*]} " =~ " ${COMPRESS_ALGORITHM} " ]] && log "-c | --compress specified option is invalid: ${COMPRESS_ALGORITHM}. Valid options: $(join_array_by ", " "${COMPRESS_ALGORITHM_ARGS[@]}")" 1
   [[ ! " ${ACTION_ARGS[*]} " =~ " ${ACTION} " ]] && log "specified action is invalid. Valid options: $(join_array_by ", " ${ACTION_ARGS[@]})" 1
-
   [[ -n ${UNATTENDED_OPTION} ]] && [[ ! " ${UNATTENDED_OPTION_ARGS[*]} " =~ " ${UNATTENDED_OPTION} " ]] && log "-u | --unattended specified option is invalid: ${UNATTENDED_OPTION}. Valid options: $(join_array_by ", " "${UNATTENDED_OPTION_ARGS[@]}")" 1
-  [[ "${REMOTE_DOCKER}" == "${ORIGIN_DOCKER}" ]] && log "origin and destination cannot be the same." 1
 
-  [[ -n "${ORIGIN_DOCKER}" ]] && check_docker_context "${ORIGIN_DOCKER}"
+  # validate contexts
+  [[ -n ${ORIGIN_DOCKER} ]] && check_docker_context "${ORIGIN_DOCKER}"
+  [[ -n ${REMOTE_DOCKER} ]] && check_docker_context "${REMOTE_DOCKER}"
+  [[ "${REMOTE_DOCKER}" == "${ORIGIN_DOCKER}" ]] && log "origin and destination cannot be the same." 1
 }
 
 function join_array_by { d=${1-} f=${2-}; if shift 2; then printf %s "$f" "${@/#/$d}"; fi; }
@@ -215,7 +227,7 @@ function check_dependencies() {
   done
   [ ${error_flag} -eq 1 ] && goodbye
 
-  ! [ "${BASH_VERSINFO:-0}" -ge 4 ] && log "This script needs at least Bash 4, please upgrade. You can install using your package manager or run the script from a different host" 1
+  # ! [ "${BASH_VERSINFO:-0}" -ge 4 ] && log "This script needs at least Bash 4, please upgrade. You can install using your package manager or run the script from a different host" 1
 }
 
 function set_compression_algorithm() {
@@ -256,7 +268,7 @@ function check_docker_context() {
   log "        Checking if ${docker_context} exists"
   docker context inspect ${docker_context} 1>${VERBOSE}
   docker_context_status=${?}
-  if [ ${docker_context_status} -eq 0 ] ; then
+  if [ ! ${docker_context_status} -eq 0 ] ; then
     log "        Context doesn't exist!" 1
   else
     return 0
@@ -388,6 +400,12 @@ function check_container_on_host_and_stop() {
     esac
   fi
 
+  # this step needs to be performed before stopping the container to avoid data loss
+  if [[ -n "${COMMIT}" ]]; then
+    log "        Preserve current image changes requested, preparing a temporary image..."
+    env $(set_docker_context "origin") docker commit ${CONTAINER} ${COMMIT} >${VERBOSE}
+  fi
+
   if [[ -n "${KEEP_RUNNING}" ]]; then
     log "        Leaving container on origin host running..."
   else
@@ -417,24 +435,54 @@ function check_if_volume_exists() {
   return ${is_present}
 }
 
+function transfer_image() {
+  temporary_tag=${1}
+
+  log "        Copying container image: ${temporary_tag}"
+  env $(set_docker_context "origin") docker save ${temporary_tag} | pv -cN ${temporary_tag} -s $(docker image inspect ${temporary_tag} --format='{{.Size}}') | ${COMPRESS_BINARY} | env $(set_docker_context "destination") docker load
+}
+
+function change_image_tag() {
+  docker_actor=${1}
+  docker_image=${2}
+  temporary_tag=${3}
+
+  log "        Restoring original tag on the ${docker_actor} host"
+  env $(set_docker_context "destination") docker image tag ${temporary_tag} ${docker_image} 1>${VERBOSE}
+}
+
+function remove_temporary_image() {
+  docker_actor=${1}
+  docker_image=${2}
+
+  log "        Removing temporary image on the ${docker_actor} host"
+  env $(set_docker_context "origin") docker image rm ${docker_image} 1>${VERBOSE}
+}
+
 function copy_image() {
   docker_image=${1}
 
-  log "        Checking if ${docker_image} already exists on destination host"
-  env $(set_docker_context "destination") docker image inspect --format='{{.Config.Image}}' ${docker_image} 1>${VERBOSE}
-  remote_image_status=${?}
-  if [ ${remote_image_status} -eq 0 ] ; then
-    log "        Image is available on the destination host!"
+  if [[ -n "${COMMIT}" ]]; then
+    log "        Preserve current image changes requested..."
+    transfer_image ${COMMIT}
+    change_image_tag "destination" ${docker_image} ${COMMIT}
+    remove_temporary_image "origin" ${COMMIT}
   else
-    log "        Image doesn't exist on destination host, trying to pull ${docker_image} from upstream"
-    env $(set_docker_context "destination") docker pull ${docker_image} 1>${VERBOSE}
-    remote_pull_status=${?}
-    if [ ${remote_pull_status} -eq 0 ] ; then
-      log "        Image successfully pulled from the registry"
+    log "        Checking if ${docker_image} already exists on destination host"
+    env $(set_docker_context "destination") docker image inspect --format='{{.Config.Image}}' ${docker_image} 1>${VERBOSE}
+    remote_image_status=${?}
+    if [ ${remote_image_status} -eq 0 ] ; then
+      log "        Image is available on the destination host!"
     else
-      log "        Failed. Image needs to be pushed from this host to remote."
-      log "        Copying container image: ${docker_image}"
-      env $(set_docker_context "origin") docker save ${docker_image} | pv -cN ${docker_image} -s $(docker image inspect ${docker_image} --format='{{.Size}}') | bzip2 | env $(set_docker_context "destination") docker load
+      log "        Image doesn't exist on destination host, trying to pull ${docker_image} from upstream"
+      env $(set_docker_context "destination") docker pull ${docker_image} 1>${VERBOSE}
+      remote_pull_status=${?}
+      if [ ${remote_pull_status} -eq 0 ] ; then
+        log "        Image successfully pulled from the registry"
+      else
+        log "        Failed. Image needs to be pushed from this host to remote."
+        transfer_image ${docker_image}
+      fi
     fi
   fi
 }
@@ -521,6 +569,7 @@ function run_container() {
   # removing the detach option if it exists, so we avoid duplicated parameters
   docker_command=${docker_command/ -d / }
   docker_command=${docker_command/ --detach / }
+  docker_command=${docker_command/ --detach=true / }
 
   # inserting the detach option
   docker_command=${docker_command/docker run/docker run -d}
@@ -557,9 +606,6 @@ function transfer_container() {
   log "  1/5 - Check for compatibility"
   check_compatibility
 
-  # log "1/5 - Creating commit for your container"
-  # docker commit ${CONTAINER} ${COMMIT} >/dev/null
-
   # iterate all the networks
   log "  2/5 - Creating networks"
   networks=$(env $(set_docker_context "origin") docker inspect -f '{{ range $k, $v := .NetworkSettings.Networks }}{{ $k }}{{ end }}' ${CONTAINER} 2>/dev/null)
@@ -571,8 +617,7 @@ function transfer_container() {
   iterate_volumes "${volumes}"
 
   log "  4/5 - Pulling container image on the destination host"
-  # copy_image ${COMMIT}
-  copy_image $(env $(set_docker_context "origin") docker inspect --format='{{.Config.Image}}' ${CONTAINER})
+  copy_image ${CONTAINER_IMAGE}
 
   log "  5/5 - Run container"
   run_container
@@ -589,8 +634,8 @@ trap "exit 1" TERM
 export TOP_PID=${$}
 
 TTY=$(tty)
-# COMMIT=$(openssl rand -hex 12)
 
+COMMIT=""
 VERBOSE="/dev/null" # defaulting unnecessary output to /dev/null
 COMPRESS_ALGORITHM="bzip2"
 COMPRESS_BINARY=""
@@ -631,6 +676,9 @@ do
   if [ ${exist} -eq 0 ]; then
     log "Couldn't find the specified container on the origin host!" 1
   else
+    # the original image repository and tag needs to be retrieved before commiting any change
+    CONTAINER_IMAGE=$(env $(set_docker_context "origin") docker inspect --format='{{.Config.Image}}' ${CONTAINER})
+
     transfer_container
   fi
 done

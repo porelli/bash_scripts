@@ -74,6 +74,11 @@ else
   fi
 fi
 
+# "Upgrading remaining brew cask apps..."
 brew cu -a -y
 
+# "Upgrading AppStore packages..." 
 mas upgrade
+
+# "Upgrading MacOS internal packages..." 
+sudo softwareupdate -i -a

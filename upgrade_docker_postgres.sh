@@ -54,7 +54,8 @@ printf 'Done'
 
 printf '\nBacking-up current database content: '
   docker inspect "${CONTAINER}" --format='{{range .Config.Env}}{{println .}}{{end}}' | egrep '(POSTGRES_USER|POSTGRES_PASSWORD|PGDATA)' > ${PG_ENV}
-  source ${PG_ENV}
+  # source variables skipping single quotes and wrapping all variables in single quotes just for this script. When Docker will source the PGENV file the escaping might cause issues
+  source <(echo ${PG_ENV} | sed -r "s/\x27/'\"'\"'/g" | sed -r 's/^(\w+)=(.+)/\1=\x27\2\x27/')
 
   if [ ! -n "${POSTGRES_USER}" ];     then echo "POSTGRES_USER is not available!"     ; exit 1; fi
   if [ ! -n "${POSTGRES_PASSWORD}" ]; then echo "POSTGRES_PASSWORD is not available!" ; exit 1; fi
@@ -140,6 +141,6 @@ printf "\nPlease update your original container or docker compose to use ${IMAGE
 printf "  rm ${PG_DUMP} # <- this is the database backup \n"
 printf "  rm ${PG_ENV} # <- these are the database env variables \n\n"
 printf "\nIf you get any permission issue for your pre-existing PostgreSQL role, execute on of these commands before deleting the files above:\n"
-printf "  source ${PG_ENV}; docker exec -i ${CONTAINER} psql -U "$'${POSTGRES_USER} -c "ALTER USER ${POSTGRES_USER} WITH PASSWORD \'${POSTGRES_PASSWORD}\';"'" # for MD5 auth \n\n"
-printf "  source ${PG_ENV}; docker exec -i ${CONTAINER} psql -U "$'${POSTGRES_USER} -c "SET password_encryption  = \'scram-sha-256\'; ALTER USER ${POSTGRES_USER} WITH PASSWORD \'${POSTGRES_PASSWORD}\';"'" # for SCRAM auth \n\n"
+printf "  source ${PG_ENV}; export "'POSTGRES_PASSWORD=${POSTGRES_PASSWORD'"//\\\'/\\\'\\\'}"" ; docker exec -i ${CONTAINER} psql -U "$'${POSTGRES_USER} -c "ALTER USER ${POSTGRES_USER} WITH PASSWORD \'${POSTGRES_PASSWORD}\';"'" ; unset POSTGRES_USER ; unset POSTGRES_PASSWORD # for MD5 auth \n\n"
+printf "  source ${PG_ENV}; export "'POSTGRES_PASSWORD=${POSTGRES_PASSWORD'"//\\\'/\\\'\\\'}"" ; docker exec -i ${CONTAINER} psql -U "$'${POSTGRES_USER} -c "SET password_encryption  = \'scram-sha-256\'; ALTER USER ${POSTGRES_USER} WITH PASSWORD \'${POSTGRES_PASSWORD}\';"'" ; unset POSTGRES_USER ; unset POSTGRES_PASSWORD # for SCRAM auth \n\n"
 printf "\nSometimes you also need to drop the PATH ENV variable from your container. For example, if you are switching from the alpine to debian version of the postgres image\n\n"

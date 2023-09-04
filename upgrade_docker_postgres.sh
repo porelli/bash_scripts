@@ -100,7 +100,7 @@ printf '\nStopping the original container: '
   docker stop "${CONTAINER}" >/dev/null
 printf 'Done'
 
-# if anything goes wrong after creating the backup... replace the two variables PG_ENV and PG_DUMP, uncomment the row below and delete anything above her up to the EMERGENCY MARKER
+# if anything goes wrong after creating the backup... replace the two variables PG_ENV and PG_DUMP around line 20, uncomment the rows below and delete anything above up to the EMERGENCY MARKER
 # set +e
 # docker stop ${TEMP_CONTAINER} ; docker rm ${TEMP_CONTAINER}
 # set -e
